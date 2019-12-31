@@ -52,15 +52,15 @@ class Loader {
     * However, you can invoke it on your own without changing the window's hash
     * */
     load(template) {
-        this._fetchTemplate(template)
-            .then(el => this._setTemplate(el))
-            .then(() => this.currentTemplate = template)
-            .then(() => this._setTitle())
-            .then(() => this._dispatchLoadedEvent())
-            .catch(err => {
-                console.log(err)
-                window.location.hash = `#${this.errorTemplate}`
-            })
+        this._fetchTemplate(template).then(el => {
+            this.currentTemplate = template
+            this._setTemplate(el)
+            this._setTitle()
+            this._dispatchLoadedEvent()
+        }).catch(err => {
+            console.log(err)
+            window.location.hash = `#${this.errorTemplate}`
+        })
     }
 
     /*

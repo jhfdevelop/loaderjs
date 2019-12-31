@@ -1,6 +1,6 @@
 /*
 * Compatibility version of loader.js
-* Used in browsers that do not support ES6 modules
+* Used in internet explorer
 * */
 
 
@@ -16,15 +16,16 @@ window.Loader = function (options) {
 
 window.Loader.prototype = {
     load: function (template) {
-        this._fetchTemplate(template)
-            .then(el => this._setTemplate(el))
-            .then(() => this.currentTemplate = template)
-            .then(() => this._setTitle())
-            .then(() => this._dispatchLoadedEvent())
-            .catch(err => {
-                console.log(err)
-                window.location.hash = `#${this.errorTemplate}`
-            })
+        let me = this
+        this._fetchTemplate(template, function (el) {
+            me._setTemplate(el)
+            me.currentTemplate = template
+            me._setTitle()
+            me._dispatchLoadedEvent()
+        }, function (status) {
+            console.log('error, cannot load template: ' + status)
+            window.location.hash = '#' + this.errorTemplate
+        })
     },
 
     setListening: function (listening) {
@@ -59,18 +60,27 @@ window.Loader.prototype = {
         this.load(template)
     },
 
-    _fetchTemplate: function (template) {
-        return fetch(`${this.templatesDir}/${template}.html`)
-            .then(data => data.text())
-            .then(data => this._parseTemplate(data))
+    _fetchTemplate: function (template, callback, errorCallback) {
+
+        let request = new XMLHttpRequest()
+        let me = this
+        request.addEventListener('load', function (evt) {
+            if (request.status === 200) {
+                callback(me._parseTemplate(request.responseText))
+            } else {
+                errorCallback(request.status)
+            }
+        })
+        request.open('GET', this.templatesDir + '/' + template + '.html');
+        request.send()
     },
 
     _parseTemplate: function (templateData) {
-        return new Promise(resolve => {
-            const templateEl = document.createElement('div')
-            templateEl.innerHTML = templateData
-            resolve(templateEl.querySelector('template'))
-        })
+        templateData = templateData.replace('template>', 'div>')
+
+        const templateEl = document.createElement('div')
+        templateEl.innerHTML = templateData
+        return templateEl.querySelector('div')
     },
 
     _setTemplate: function (el) {
@@ -80,7 +90,7 @@ window.Loader.prototype = {
         }
 
         this._clearNode(this.contentEl)
-        this.contentEl.appendChild(el.content.cloneNode(true))
+        this.contentEl.appendChild(el)
     },
 
     _clearNode: function (node) {
@@ -93,11 +103,10 @@ window.Loader.prototype = {
         let currentTemplate = this.currentTemplate
         let me = this
 
-        const event = new CustomEvent('templateLoaded', {
-            detail: {
-                template: currentTemplate,
-                source: me
-            }
+        const event = document.createEvent('CustomEvent')
+        event.initCustomEvent('templateLoaded', false, false, {
+            template: currentTemplate,
+            source: me
         })
 
         dispatchEvent(event)
@@ -105,8 +114,7 @@ window.Loader.prototype = {
 
     _setTitle: function () {
         if (this.updateTitle) {
-            document.title = `${this.titleBase} | ${this.currentTemplate}`
+            document.title = this.titleBase + ' | ' + this.currentTemplate
         }
     }
 }
-
